@@ -16,7 +16,6 @@ class CycloneDataProcessor:
         for year in self.df['Year'].unique():
             year_data = self.df[self.df['Year'] == year]
             for i, month in enumerate(self.months):
-                # Extract current month's data for all types
                 total = year_data[f'{month}: TOTAL'].iloc[0]
                 bob = year_data[f'{month}: BOB'].iloc[0]
                 arab_sea = year_data[f'{month}: AS'].iloc[0]
@@ -176,16 +175,13 @@ def make_future_predictions(future_year, processed_df, rf_models, scaler):
     predictions = []
 
     for i, month in enumerate(months):
-        # Get recent data from the past 5 years
         recent_data = processed_df[
             (processed_df['Year'] >= future_year - 5) &
             (processed_df['Year'] < future_year)
         ]
 
-        # Filter the data for the current month
         month_data = recent_data[recent_data['Month'] == month]
 
-        # Prepare the feature set
         features = np.array([[ 
             future_year,
             i,
@@ -195,25 +191,19 @@ def make_future_predictions(future_year, processed_df, rf_models, scaler):
             month_data['Seasonal_Strength'].mean() if not month_data.empty else 1
         ]])
 
-        # Scale the features
         scaled_features = scaler.transform(features)
 
-        # Prepare a dictionary to store predictions for this month
         prediction = {
             'Month': month
         }
 
-        # Add variability for years beyond 2025
         variability_factor = 1 + ((future_year - 2025) / 100) if future_year >= 2025 else 1
 
-        # Make predictions for each cyclone type
         for cyclone_type in rf_models.keys():
             rf_prob = rf_models[cyclone_type].predict_proba(scaled_features)[0][1] * 100
-            # Apply variability for years beyond 2025
             rf_prob *= variability_factor
             prediction[f'RF_Probability_{cyclone_type}'] = round(rf_prob, 1)
 
-            # Generate fuzzy probabilities with seeding
             seed_value = hash(f"{future_year}-{i}-{cyclone_type}") % (2**32 - 1)
             np.random.seed(seed_value)
             prediction[f'Fuzzy_Probability_{cyclone_type}'] = abs(round(
